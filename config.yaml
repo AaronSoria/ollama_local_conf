@@ -61,8 +61,8 @@ chat_model: qwen2.5-coder
 # Podés usar ruta relativa (resuelta contra la raíz del repo) o absoluta,
 # por ejemplo si moviste docs-sources fuera del repo:
 #   docs_dir: /home/tu_usuario/docs-sources
-docs_dir: ./docs-sources
-db_dir: ./chroma-db
+docs_dir: /home/allens28/docs-sources
+db_dir: /home/allens28/chroma-db
 
 # --- Configuración de chunking ---
 chunk_size: 1200
