@@ -31,6 +31,13 @@ def load_config():
         return yaml.safe_load(f)
 
 
+def resolve_path(path_str: str) -> Path:
+    """Soporta rutas absolutas (/home/user/docs-sources), con ~ (~/docs-sources)
+    y relativas (./docs-sources, resueltas contra la raíz del repo)."""
+    p = Path(path_str).expanduser()
+    return p if p.is_absolute() else (ROOT / p).resolve()
+
+
 def file_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -167,9 +174,11 @@ def main():
     args = parser.parse_args()
 
     config = load_config()
-    docs_dir = ROOT / config["docs_dir"].lstrip("./")
-    db_dir = ROOT / config["db_dir"].lstrip("./")
+    docs_dir = resolve_path(config["docs_dir"])
+    db_dir = resolve_path(config["db_dir"])
     db_dir.mkdir(parents=True, exist_ok=True)
+    print(f"docs_dir resuelto a: {docs_dir}")
+    print(f"db_dir resuelto a: {db_dir}")
 
     client = chromadb.PersistentClient(path=str(db_dir))
 

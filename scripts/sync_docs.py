@@ -25,6 +25,13 @@ def load_config():
         return yaml.safe_load(f)
 
 
+def resolve_path(path_str: str) -> Path:
+    """Soporta rutas absolutas (/home/user/docs-sources), con ~ (~/docs-sources)
+    y relativas (./docs-sources, resueltas contra la raíz del repo)."""
+    p = Path(path_str).expanduser()
+    return p if p.is_absolute() else (ROOT / p).resolve()
+
+
 def run(cmd, cwd=None):
     print(f"  $ {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
@@ -75,8 +82,9 @@ def main():
     args = parser.parse_args()
 
     config = load_config()
-    docs_dir = ROOT / config["docs_dir"].lstrip("./")
+    docs_dir = resolve_path(config["docs_dir"])
     docs_dir.mkdir(parents=True, exist_ok=True)
+    print(f"docs_dir resuelto a: {docs_dir}")
 
     sources = config["sources"]
     if args.only:

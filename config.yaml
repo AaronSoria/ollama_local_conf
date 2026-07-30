@@ -52,7 +52,10 @@ embedding_model: nomic-embed-text
 chat_model: qwen2.5-coder
 
 # --- Configuración de directorios ---
-docs_dir: ./docs-sources
+# Podés usar ruta relativa (resuelta contra la raíz del repo) o absoluta,
+# por ejemplo si moviste docs-sources fuera del repo:
+#   docs_dir: /home/tu_usuario/docs-sources
+docs_dir: /home/allens28/docs-sources
 db_dir: ./chroma-db
 
 # --- Configuración de chunking ---

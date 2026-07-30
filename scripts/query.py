@@ -31,6 +31,13 @@ def load_config():
         return yaml.safe_load(f)
 
 
+def resolve_path(path_str: str) -> Path:
+    """Soporta rutas absolutas (/home/user/docs-sources), con ~ (~/docs-sources)
+    y relativas (./docs-sources, resueltas contra la raíz del repo)."""
+    p = Path(path_str).expanduser()
+    return p if p.is_absolute() else (ROOT / p).resolve()
+
+
 def build_context(client, collections: list[str], question: str,
                    embedding_model: str, top_k: int):
     q_emb = ollama.embeddings(model=embedding_model, prompt=question)["embedding"]
@@ -68,7 +75,7 @@ def main():
         sys.exit(1)
 
     config = load_config()
-    db_dir = ROOT / config["db_dir"].lstrip("./")
+    db_dir = resolve_path(config["db_dir"])
     client = chromadb.PersistentClient(path=str(db_dir))
 
     collections = [c.strip() for c in args.collection.split(",")]
