@@ -72,7 +72,7 @@ python3 scripts/query.py --collection vue --show-context "como defino un composa
 ```
 
 Colecciones disponibles por defecto: `csharp`, `go`, `vue`, `angular`,
-`python`, `patterns`.
+`python`, `flutter`, `patterns`.
 
 ## Mantener todo actualizado
 
