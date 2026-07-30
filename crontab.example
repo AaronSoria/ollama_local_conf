@@ -1,0 +1,5 @@
+# Ejemplo de entrada de crontab. Editar con: crontab -e
+# Ajustar la ruta absoluta al repo clonado en el servidor.
+
+# Todos los domingos a las 3:00 AM: sincroniza repos + reindexa lo que cambió
+0 3 * * 0 /home/TU_USUARIO/ollama-docs-rag/scripts/run_update.sh >> /home/TU_USUARIO/ollama-docs-rag/update.log 2>&1

@@ -1,0 +1,61 @@
+# Configuración central del pipeline RAG de documentación técnica.
+# Cada "source" es una colección independiente en Chroma (y un workspace conceptual).
+#
+# sparse_path: subcarpeta del repo que realmente contiene la documentación.
+#   Se usa git sparse-checkout para NO descargar el repo completo (algunos son enormes).
+#   Dejar como "" para clonar el repo completo (útil en repos chicos que son 100% docs).
+
+sources:
+  - name: csharp
+    repo: https://github.com/dotnet/docs
+    branch: main
+    sparse_path: docs
+    extensions: [".md"]
+
+  - name: go
+    repo: https://github.com/golang/go
+    branch: master
+    sparse_path: doc
+    extensions: [".html", ".md"]
+
+  - name: vue
+    repo: https://github.com/vuejs/docs
+    branch: main
+    sparse_path: src
+    extensions: [".md"]
+
+  - name: angular
+    repo: https://github.com/angular/angular
+    branch: main
+    sparse_path: adev/src/content
+    extensions: [".md"]
+
+  - name: python
+    repo: https://github.com/python/cpython
+    branch: main
+    sparse_path: Doc
+    extensions: [".rst"]
+
+  - name: patterns
+    # Refactoring Guru no tiene repo oficial abierto (contenido con copyright).
+    # Esta es una alternativa open source de patrones de diseño.
+    # Si compraste el material de Refactoring Guru, poné los .md/.pdf exportados
+    # manualmente en docs-sources/patterns/ y el indexador los va a tomar igual.
+    repo: https://github.com/kamranahmedse/design-patterns-for-humans
+    branch: master
+    sparse_path: ""
+    extensions: [".md"]
+
+# --- Configuración de Ollama ---
+ollama_host: http://localhost:11434
+embedding_model: nomic-embed-text
+chat_model: qwen2.5-coder
+
+# --- Configuración de directorios ---
+docs_dir: ./docs-sources
+db_dir: ./chroma-db
+
+# --- Configuración de chunking ---
+chunk_size: 1200
+chunk_overlap: 150
+top_k: 5
