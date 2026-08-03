@@ -106,7 +106,118 @@ contenido de Refactoring Guru, podés exportarlo/guardarlo manualmente como
 `.md` dentro de `docs-sources/patterns/` y `index.py` lo va a tomar igual en
 la próxima corrida (no hace falta que venga de un `git clone`).
 
-## Notas de diseño
+## Integración con VS Code
+
+Hay dos formas de usar esto desde el editor. Ambas asumen que te conectás al
+servidor por **VS Code Remote-SSH** (así el editor corre "en" el servidor y
+no hay que exponer nada a internet).
+
+### Opción A: Continue.dev (más simple, chat con contexto manual)
+
+Instalá la extensión **Continue** en VS Code. Levantá el servidor HTTP en el
+servidor (dejalo corriendo con `tmux` o como servicio, ver más abajo):
+
+```bash
+pip install fastapi uvicorn
+uvicorn scripts.api_server:app --host 127.0.0.1 --port 8008 --app-dir scripts
+```
+
+En `~/.continue/config.json` (se edita desde la propia extensión, "Open
+config.json"):
+
+```jsonc
+{
+  "models": [
+    {
+      "title": "Qwen Coder (local)",
+      "provider": "ollama",
+      "model": "qwen2.5-coder",
+      "apiBase": "http://localhost:11434"
+    }
+  ],
+  "contextProviders": [
+    {
+      "name": "http",
+      "params": {
+        "url": "http://localhost:8008/retrieve",
+        "title": "docs",
+        "description": "Documentación oficial indexada (C#, Go, Vue, Angular, Python, Flutter, patrones)",
+        "displayTitle": "Docs locales"
+      }
+    }
+  ]
+}
+```
+
+Como VS Code se conecta por Remote-SSH, `localhost:8008` ya es el servidor
+(no hace falta port-forwarding manual). En el chat de Continue escribís
+`@docs como implemento un composable en vue` y te inyecta el contexto
+recuperado antes de preguntarle al modelo.
+
+### Opción B: Cline + MCP (agente que decide solo cuándo consultar la doc)
+
+Esta es la que se parece a Claude Code: un agente que puede editar archivos,
+correr comandos, y **decidir por su cuenta** cuándo llamar a una herramienta
+— en este caso, tu buscador de documentación.
+
+```bash
+pip install "mcp[cli]"
+```
+
+Instalá la extensión **Cline** en VS Code y configurala para usar tu Ollama
+(Settings de Cline → API Provider → Ollama → Base URL `http://localhost:11434`
+→ modelo `qwen2.5-coder` o el que uses para código).
+
+Después, en la config de MCP servers de Cline (`cline_mcp_settings.json`,
+accesible desde el ícono de MCP en la barra lateral de Cline):
+
+```json
+{
+  "mcpServers": {
+    "docs-rag": {
+      "command": "/home/allens28/ollama-docs-rag/.venv/bin/python3",
+      "args": ["/home/allens28/ollama-docs-rag/scripts/mcp_server.py"]
+    }
+  }
+}
+```
+
+(ajustá la ruta del venv y del repo a las tuyas). Cline va a listar dos
+herramientas nuevas: `list_doc_collections` y `search_docs`. Cuando le pidas
+algo como "escribime un servicio en Angular que consuma esta API", el agente
+va a decidir solo si conviene llamar a `search_docs` antes de escribir código,
+sin que se lo tengas que pedir explícitamente con `@`.
+
+### Dejar los servidores corriendo de forma estable
+
+El servidor HTTP (Continue) conviene dejarlo como servicio, no en una
+terminal suelta:
+
+```ini
+# /etc/systemd/system/docs-rag-api.service
+[Unit]
+Description=ollama-docs-rag API
+After=network.target
+
+[Service]
+User=allens28
+WorkingDirectory=/home/allens28/ollama-docs-rag
+ExecStart=/home/allens28/ollama-docs-rag/.venv/bin/uvicorn scripts.api_server:app --host 127.0.0.1 --port 8008 --app-dir scripts
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now docs-rag-api
+```
+
+El servidor MCP (Cline) **no** necesita esto — Cline lo lanza y lo mata solo
+cada vez que lo necesita, como subproceso.
+
+
 
 - El chunking es simple (por párrafos, con solapamiento) para minimizar
   dependencias. Si necesitás algo más sofisticado (chunking consciente de

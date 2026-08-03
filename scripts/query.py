@@ -10,53 +10,8 @@ Uso:
 """
 import argparse
 import sys
-from pathlib import Path
 
-import chromadb
-import ollama
-import yaml
-
-ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = ROOT / "config.yaml"
-
-SYSTEM_PROMPT = """Sos un asistente técnico. Respondé ÚNICAMENTE en base al CONTEXTO \
-provisto abajo, extraído de documentación oficial. Si el contexto no alcanza para \
-responder con seguridad, decilo explícitamente en vez de inventar información. \
-Cuando generes código, basate en los ejemplos y convenciones del contexto. \
-Al final de tu respuesta, listá los archivos fuente que usaste (campo "Fuentes")."""
-
-
-def load_config():
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-def resolve_path(path_str: str) -> Path:
-    """Soporta rutas absolutas (/home/user/docs-sources), con ~ (~/docs-sources)
-    y relativas (./docs-sources, resueltas contra la raíz del repo)."""
-    p = Path(path_str).expanduser()
-    return p if p.is_absolute() else (ROOT / p).resolve()
-
-
-def build_context(client, collections: list[str], question: str,
-                   embedding_model: str, top_k: int):
-    q_emb = ollama.embeddings(model=embedding_model, prompt=question)["embedding"]
-
-    all_chunks = []
-    for name in collections:
-        try:
-            collection = client.get_collection(name=name)
-        except Exception:
-            print(f"[WARN] la colección '{name}' no existe todavía. "
-                  f"Corré sync_docs.py + index.py primero.", file=sys.stderr)
-            continue
-        result = collection.query(query_embeddings=[q_emb], n_results=top_k)
-        docs = result.get("documents", [[]])[0]
-        metas = result.get("metadatas", [[]])[0]
-        for doc, meta in zip(docs, metas):
-            all_chunks.append((f"{name}/{meta.get('source_file', '?')}", doc))
-
-    return all_chunks
+import rag_core as rag
 
 
 def main():
@@ -74,36 +29,17 @@ def main():
         print("No se recibió ninguna pregunta.", file=sys.stderr)
         sys.exit(1)
 
-    config = load_config()
-    db_dir = resolve_path(config["db_dir"])
-    client = chromadb.PersistentClient(path=str(db_dir))
-
     collections = [c.strip() for c in args.collection.split(",")]
-    top_k = args.top_k or config["top_k"]
-
-    chunks = build_context(client, collections, question,
-                            config["embedding_model"], top_k)
-
-    if not chunks:
-        print("No se encontró contexto relevante en las colecciones indicadas.")
-        sys.exit(1)
-
-    context_text = "\n\n---\n\n".join(f"[Fuente: {src}]\n{doc}" for src, doc in chunks)
 
     if args.show_context:
+        chunks = rag.retrieve(collections, question, args.top_k)
         print("=" * 60)
         print("CONTEXTO RECUPERADO:")
-        print(context_text)
+        print(rag.format_context(chunks))
         print("=" * 60, "\n")
 
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"CONTEXTO:\n{context_text}\n\nPREGUNTA:\n{question}"},
-    ]
-
-    stream = ollama.chat(model=config["chat_model"], messages=messages, stream=True)
-    for part in stream:
-        print(part["message"]["content"], end="", flush=True)
+    for token in rag.ask(collections, question, args.top_k, stream=True):
+        print(token, end="", flush=True)
     print()
 
 

@@ -1,0 +1,105 @@
+"""
+Lógica compartida de RAG: carga de config, retrieval en ChromaDB y llamada
+al modelo de chat de Ollama. La usan query.py (CLI), api_server.py (HTTP,
+para Continue.dev) y mcp_server.py (MCP, para Cline / Claude Code / etc).
+"""
+import sys
+from pathlib import Path
+
+import chromadb
+import ollama
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = ROOT / "config.yaml"
+
+SYSTEM_PROMPT = """Sos un asistente técnico integrado en un editor de código. Respondé \
+ÚNICAMENTE en base al CONTEXTO provisto abajo, extraído de documentación oficial. Si el \
+contexto no alcanza para responder con seguridad, decilo explícitamente en vez de \
+inventar información. Cuando generes código, basate en los ejemplos y convenciones del \
+contexto. Al final de tu respuesta, listá los archivos fuente que usaste (campo "Fuentes")."""
+
+_config_cache = None
+_client_cache = None
+
+
+def load_config():
+    global _config_cache
+    if _config_cache is None:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            _config_cache = yaml.safe_load(f)
+    return _config_cache
+
+
+def resolve_path(path_str: str) -> Path:
+    p = Path(path_str).expanduser()
+    return p if p.is_absolute() else (ROOT / p).resolve()
+
+
+def get_client():
+    global _client_cache
+    if _client_cache is None:
+        config = load_config()
+        db_dir = resolve_path(config["db_dir"])
+        _client_cache = chromadb.PersistentClient(path=str(db_dir))
+    return _client_cache
+
+
+def available_collections() -> list[str]:
+    return [c.name for c in get_client().list_collections()]
+
+
+def retrieve(collections: list[str], question: str, top_k: int | None = None):
+    """Devuelve lista de (fuente, texto_chunk) más relevantes para la pregunta."""
+    config = load_config()
+    client = get_client()
+    top_k = top_k or config["top_k"]
+
+    q_emb = ollama.embeddings(model=config["embedding_model"], prompt=question)["embedding"]
+
+    all_chunks = []
+    for name in collections:
+        try:
+            collection = client.get_collection(name=name)
+        except Exception:
+            print(f"[WARN] la colección '{name}' no existe. Corré sync_docs.py + index.py.",
+                  file=sys.stderr)
+            continue
+        result = collection.query(query_embeddings=[q_emb], n_results=top_k)
+        docs = result.get("documents", [[]])[0]
+        metas = result.get("metadatas", [[]])[0]
+        for doc, meta in zip(docs, metas):
+            all_chunks.append((f"{name}/{meta.get('source_file', '?')}", doc))
+
+    return all_chunks
+
+
+def format_context(chunks: list[tuple[str, str]]) -> str:
+    return "\n\n---\n\n".join(f"[Fuente: {src}]\n{doc}" for src, doc in chunks)
+
+
+def ask(collections: list[str], question: str, top_k: int | None = None, stream: bool = False):
+    """Retrieval + generación. Si stream=True devuelve un generador de tokens,
+    si no, devuelve el string completo de la respuesta y las fuentes usadas."""
+    config = load_config()
+    chunks = retrieve(collections, question, top_k)
+
+    if not chunks:
+        result = "No se encontró contexto relevante en las colecciones indicadas."
+        return (iter([result]) if stream else (result, []))
+
+    context_text = format_context(chunks)
+    sources = [src for src, _ in chunks]
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"CONTEXTO:\n{context_text}\n\nPREGUNTA:\n{question}"},
+    ]
+
+    if stream:
+        def gen():
+            for part in ollama.chat(model=config["chat_model"], messages=messages, stream=True):
+                yield part["message"]["content"]
+        return gen()
+
+    response = ollama.chat(model=config["chat_model"], messages=messages, stream=False)
+    return response["message"]["content"], sources
