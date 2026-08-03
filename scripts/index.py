@@ -148,11 +148,13 @@ def index_source(source, docs_dir: Path, db_dir: Path, client, embedding_model: 
             continue
 
         ids, embeddings, documents, metadatas = [], [], [], []
+        had_error = False
         for i, chunk in enumerate(chunks):
             try:
                 resp = ollama.embeddings(model=embedding_model, prompt=chunk)
             except Exception as e:
                 print(f"  [ERROR] embedding falló en {relpath} chunk {i}: {e}")
+                had_error = True
                 continue
             ids.append(f"{relpath}::chunk{i}")
             embeddings.append(resp["embedding"])
@@ -163,7 +165,10 @@ def index_source(source, docs_dir: Path, db_dir: Path, client, embedding_model: 
             collection.upsert(ids=ids, embeddings=embeddings,
                                documents=documents, metadatas=metadatas)
 
-        manifest[relpath] = h
+        if had_error:
+            print(f"  [WARN] {relpath} tuvo errores parciales, se reintentará en la próxima corrida.")
+        else:
+            manifest[relpath] = h
 
     save_manifest(manifest_path, manifest)
     print(f"[{name}] listo. Colección tiene {collection.count()} chunks.")
