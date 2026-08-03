@@ -22,6 +22,18 @@ contexto. Al final de tu respuesta, listá los archivos fuente que usaste (campo
 _config_cache = None
 _client_cache = None
 
+_CHROMA_PREFIX = "docs_"
+
+
+def chroma_name(friendly_name: str) -> str:
+    """Chroma exige nombres de 3-512 chars [a-zA-Z0-9._-]. Nombres cortos como
+    'go' (2 chars) no son válidos, así que siempre anteponemos un prefijo fijo."""
+    return f"{_CHROMA_PREFIX}{friendly_name}"
+
+
+def friendly_name(chroma_collection_name: str) -> str:
+    return chroma_collection_name.removeprefix(_CHROMA_PREFIX)
+
 
 def load_config():
     global _config_cache
@@ -46,7 +58,7 @@ def get_client():
 
 
 def available_collections() -> list[str]:
-    return [c.name for c in get_client().list_collections()]
+    return [friendly_name(c.name) for c in get_client().list_collections()]
 
 
 def retrieve(collections: list[str], question: str, top_k: int | None = None):
@@ -60,7 +72,7 @@ def retrieve(collections: list[str], question: str, top_k: int | None = None):
     all_chunks = []
     for name in collections:
         try:
-            collection = client.get_collection(name=name)
+            collection = client.get_collection(name=chroma_name(name))
         except Exception:
             print(f"[WARN] la colección '{name}' no existe. Corré sync_docs.py + index.py.",
                   file=sys.stderr)

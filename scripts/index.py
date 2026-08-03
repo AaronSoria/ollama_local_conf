@@ -22,6 +22,8 @@ import ollama
 import yaml
 from tqdm import tqdm
 
+import rag_core as rag
+
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
 
@@ -102,13 +104,13 @@ def index_source(source, docs_dir: Path, db_dir: Path, client, embedding_model: 
         print(f"[{name}] no existe {source_dir}, corré sync_docs.py primero. Saltando.")
         return
 
-    collection = client.get_or_create_collection(name=name)
+    collection = client.get_or_create_collection(name=rag.chroma_name(name))
     manifest = {} if force_rebuild else load_manifest(manifest_path)
 
     if force_rebuild:
         print(f"[{name}] --rebuild: borrando colección existente...")
-        client.delete_collection(name=name)
-        collection = client.get_or_create_collection(name=name)
+        client.delete_collection(name=rag.chroma_name(name))
+        collection = client.get_or_create_collection(name=rag.chroma_name(name))
 
     files = collect_files(source_dir, source.get("sparse_path", ""), source["extensions"])
     current_relpaths = set()
