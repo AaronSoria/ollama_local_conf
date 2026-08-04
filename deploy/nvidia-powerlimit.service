@@ -1,0 +1,12 @@
+[Unit]
+Description=Cap NVIDIA GPU power limit to 300W (mitiga Xid 79 bajo carga sostenida de inferencia)
+After=nvidia-persistenced.service
+Wants=nvidia-persistenced.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/nvidia-smi -pl 300
+
+[Install]
+WantedBy=multi-user.target
