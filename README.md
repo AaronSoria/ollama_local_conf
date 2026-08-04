@@ -160,8 +160,14 @@ Esta es la que se parece a Claude Code: un agente que puede editar archivos,
 correr comandos, y **decidir por su cuenta** cuándo llamar a una herramienta
 — en este caso, tu buscador de documentación.
 
+> **Guía completa y verificada:** ver [`CLINE_SETUP.md`](./CLINE_SETUP.md),
+> con la configuración exacta que terminó funcionando (Cline corriendo
+> local, no por Remote-SSH, conectado al servidor por Ollama + SSH stdio
+> para el MCP) y una tabla de troubleshooting de los problemas reales que
+> fuimos encontrando (timeouts, modelo equivocado, hostname sin resolver).
+
 ```bash
-pip install "mcp[cli]"
+pip install fastmcp
 ```
 
 Instalá la extensión **Cline** en VS Code y configurala para usar tu Ollama
@@ -217,7 +223,29 @@ sudo systemctl enable --now docs-rag-api
 El servidor MCP (Cline) **no** necesita esto — Cline lo lanza y lo mata solo
 cada vez que lo necesita, como subproceso.
 
+## Nota de hardware: power limit de la GPU
 
+Si tu GPU tuvo cortes tipo "GPU has fallen off the bus" (Xid 79) bajo la
+carga sostenida de inferencia (a diferencia de cargas CUDA en ráfagas
+cortas, como cifrado post-cuántico u otros benchmarks breves), puede ser
+un tema de picos transitorios de consumo no cubiertos por la fuente/cableado.
+`deploy/nvidia-powerlimit.service` cappea el power limit de forma persistente
+entre reboots. Instalación:
+
+```bash
+sudo systemctl enable --now nvidia-persistenced   # requerido para que el cap no se resetee
+sudo cp deploy/nvidia-powerlimit.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nvidia-powerlimit
+```
+
+Verificar que quedó aplicado:
+
+```bash
+nvidia-smi --query-gpu=power.limit --format=csv
+```
+
+## Notas de diseño
 
 - El chunking es simple (por párrafos, con solapamiento) para minimizar
   dependencias. Si necesitás algo más sofisticado (chunking consciente de
