@@ -194,6 +194,33 @@ algo como "escribime un servicio en Angular que consuma esta API", el agente
 va a decidir solo si conviene llamar a `search_docs` antes de escribir código,
 sin que se lo tengas que pedir explícitamente con `@`.
 
+### Opción C: Claude Code (MCP nativo, a nivel usuario)
+
+Claude Code puede usar este mismo `mcp_server.py` como herramienta nativa,
+sin pasar por Bash/SSH manual cada vez. Se registra una sola vez, a nivel
+usuario (`--scope user`), y queda disponible automáticamente en **cualquier**
+proyecto que abras después — no hay que repetir la configuración por repo:
+
+```bash
+claude mcp add docs-rag --scope user -- ssh allens28@192.168.100.37 /home/allens28/ollama_local_conf/.venv/bin/python3 /home/allens28/ollama_local_conf/scripts/mcp_server.py
+```
+
+(ajustá usuario/IP/rutas a las tuyas). Verificar con `claude mcp list` que
+quedó `✔ Connected`. Vas a tener tres tools disponibles:
+
+- `list_doc_collections` / `search_docs`: iguales a los de Cline.
+- `generate_scaffold(template_code, spec)`: delega código repetitivo
+  (CRUD, DTOs, mappers) a `chat_model` (local), clonando el estilo de un
+  archivo molde real del proyecto en vez de generar desde cero. Pensado
+  para que Claude Code se quede con arquitectura y lógica de negocio, y
+  derive el boilerplate mecánico al modelo local — gratis en tokens, la
+  GPU está ociosa igual.
+
+La decisión de cuándo llamar cada tool la toma el agente solo (igual que en
+Cline), guiado por la descripción de cada tool: `generate_scaffold` solo
+tiene sentido si ya existe un archivo molde real para copiar el estilo, no
+para diseño nuevo.
+
 ### Dejar los servidores corriendo de forma estable
 
 El servidor HTTP (Continue) conviene dejarlo como servicio, no en una
