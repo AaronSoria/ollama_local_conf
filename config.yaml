@@ -55,7 +55,7 @@ sources:
 # --- Configuración de Ollama ---
 ollama_host: http://localhost:11434
 embedding_model: nomic-embed-text
-chat_model: qwen2.5-coder:32b
+chat_model: qwen3-coder:30b
 
 # --- Configuración de directorios ---
 # Podés usar ruta relativa (resuelta contra la raíz del repo) o absoluta,
