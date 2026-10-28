@@ -73,6 +73,32 @@ def search_docs(collections: str, question: str, top_k: int = 5) -> str:
                 f"Revisar mcp_server.log en el servidor para el detalle completo.")
 
 
+@mcp.tool()
+def generate_scaffold(template_code: str, spec: str) -> str:
+    """Genera código repetitivo/boilerplate nuevo (CRUD, DTOs, mappers, capas análogas)
+    clonando el estilo exacto de un archivo molde ya existente en el proyecto. Usar para
+    delegar trabajo mecánico y repetitivo al modelo local en vez de generarlo en el agente
+    principal. NO usar para lógica de negocio no trivial, decisiones de arquitectura, ni
+    cuando no hay un archivo molde real del proyecto para copiar el estilo.
+
+    Args:
+        template_code: contenido completo de un archivo real del proyecto que sirve como
+            molde de estilo/convenciones (ej. un CRUD ya escrito a mano).
+        spec: descripción de la pieza nueva y análoga a generar (entidad, campos,
+            relaciones, nombre de archivo/clase esperado, etc.).
+    """
+    log.info(f"generate_scaffold(spec={spec!r}, template_len={len(template_code)})")
+    try:
+        result = rag.generate_scaffold(template_code, spec)
+        log.info(f"generate_scaffold -> {len(result)} chars generados")
+        return result
+    except Exception:
+        error_trace = traceback.format_exc()
+        log.error("generate_scaffold() falló:\n" + error_trace)
+        return (f"ERROR interno generando scaffold: {error_trace.splitlines()[-1]}. "
+                f"Revisar mcp_server.log en el servidor para el detalle completo.")
+
+
 if __name__ == "__main__":
     log.info("=== mcp_server arrancando (nueva conexión de un cliente MCP) ===")
     mcp.run()

@@ -19,6 +19,21 @@ contexto no alcanza para responder con seguridad, decilo explícitamente en vez 
 inventar información. Cuando generes código, basate en los ejemplos y convenciones del \
 contexto. Al final de tu respuesta, listá los archivos fuente que usaste (campo "Fuentes")."""
 
+SCAFFOLD_SYSTEM_PROMPT = """Sos un generador de código repetitivo (boilerplate) dentro de un \
+pipeline de desarrollo. Te dan un ARCHIVO MOLDE (código real ya existente en el proyecto) y \
+un PEDIDO que describe una pieza nueva y análoga a generar.
+
+Reglas estrictas:
+- Copiá EXACTAMENTE el estilo del molde: naming, indentación, imports, manejo de errores, \
+capas, convenciones de nombres de archivo/clase, comentarios (o ausencia de ellos).
+- No inventes arquitectura nueva ni "mejores prácticas" que no estén en el molde. Si el \
+molde no usa algo (ej. validación, logging), el resultado tampoco lo usa, salvo que el \
+PEDIDO lo pida explícitamente.
+- Adaptá únicamente lo que el PEDIDO especifica (nombres de entidad/campos/relaciones), \
+dejando todo lo demás estructuralmente idéntico al molde.
+- Devolvé ÚNICAMENTE el código resultante, sin explicaciones ni texto envolvente, sin \
+```fences``` de markdown."""
+
 _config_cache = None
 _client_cache = None
 
@@ -115,3 +130,16 @@ def ask(collections: list[str], question: str, top_k: int | None = None, stream:
 
     response = ollama.chat(model=config["chat_model"], messages=messages, stream=False)
     return response["message"]["content"], sources
+
+
+def generate_scaffold(template_code: str, spec: str) -> str:
+    """Genera código repetitivo nuevo clonando el estilo de `template_code` (un archivo
+    real del proyecto) y adaptándolo a lo que pide `spec`. Pensado para boilerplate
+    (CRUD, DTOs, mappers), no para lógica de negocio no trivial."""
+    config = load_config()
+    messages = [
+        {"role": "system", "content": SCAFFOLD_SYSTEM_PROMPT},
+        {"role": "user", "content": f"ARCHIVO MOLDE:\n{template_code}\n\nPEDIDO:\n{spec}"},
+    ]
+    response = ollama.chat(model=config["chat_model"], messages=messages, stream=False)
+    return response["message"]["content"]

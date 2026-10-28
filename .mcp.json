@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "docs-rag": {
+      "type": "stdio",
+      "command": "ssh",
+      "args": [
+        "allens28@192.168.100.37",
+        "/home/allens28/ollama_local_conf/.venv/bin/python3",
+        "/home/allens28/ollama_local_conf/scripts/mcp_server.py"
+      ]
+    }
+  }
+}
